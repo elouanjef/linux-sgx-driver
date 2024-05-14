@@ -109,8 +109,8 @@ bool sgx_has_sgx2;
 static int sgx_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &sgx_vm_ops;
-	vma->vm_flags |= VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP | VM_IO |
-			 VM_DONTCOPY;
+	vm_flags_set(vma, VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP | VM_IO 
+			| VM_DONTCOPY);
 
 	return 0;
 }
@@ -168,6 +168,41 @@ static struct miscdevice sgx_dev = {
 	.mode   = 0666,
 };
 
+#ifdef CONFIG_PROC_FS
+static int sgx_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sgx_stats_read, NULL);
+}
+
+static struct file_operations sgx_stats_ops = {
+	.owner = THIS_MODULE,
+	.open = sgx_stats_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release
+};
+
+static struct seq_operations sgx_encl_seq_ops = {
+	.start = sgx_encl_seq_start,
+	.next = sgx_encl_seq_next,
+	.stop = sgx_encl_seq_stop,
+	.show = sgx_encl_seq_show,
+};
+
+static int sgx_encl_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &sgx_encl_seq_ops);
+}
+
+static struct file_operations sgx_encl_ops = {
+	.owner = THIS_MODULE,
+	.open = sgx_encl_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release
+};
+#endif
+
 static int sgx_pm_suspend(struct device *dev)
 {
 	struct sgx_tgid_ctx *ctx;
@@ -221,7 +256,7 @@ static int sgx_dev_init(struct device *parent)
 
 		for (i = 2; i < 64; i++) {
 			cpuid_count(0x0D, i, &eax, &ebx, &ecx, &edx);
-			if ((1 << i) & sgx_xfrm_mask)
+			if ((1ULL << i) & sgx_xfrm_mask)
 				sgx_xsave_size_tbl[i] = eax + ebx;
 		}
 	}
@@ -285,6 +320,18 @@ static int sgx_dev_init(struct device *parent)
 	if (msr_reset_failed) {
 		pr_info("intel_sgx:  can not reset SGX LE public key hash MSRs\n");
 	}
+
+#ifdef CONFIG_PROC_FS
+	if (!proc_create("sgx_stats", 0444, NULL, &sgx_stats_ops)) {
+		ret = -ENOMEM;
+		goto out_workqueue;
+	}
+
+	if (!proc_create("sgx_enclaves", 0444, NULL, &sgx_encl_ops)) {
+		ret = -ENOMEM;
+		goto out_workqueue;
+	}
+#endif
 
 	return 0;
 out_workqueue:
@@ -402,6 +449,8 @@ void cleanup_sgx_module(void)
 	dev_set_uevent_suppress(&pdev->dev, true);
 	platform_device_unregister(pdev);
 	platform_driver_unregister(&sgx_drv);
+	remove_proc_entry("sgx_stats", NULL);
+	remove_proc_entry("sgx_enclaves", NULL);
 }
 
 module_init(init_sgx_module);
