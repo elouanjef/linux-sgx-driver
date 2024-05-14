@@ -86,6 +86,8 @@
     #define MSR_IA32_SGXLEPUBKEYHASH3	0x0000008F
 #endif
 
+#define PATCH_METRICS 2
+
 struct sgx_epc_page {
 	resource_size_t	pa;
 	struct list_head list;

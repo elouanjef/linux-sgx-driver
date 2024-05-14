@@ -66,6 +66,11 @@
 #else
 	#include <linux/mm.h>
 #endif
+#include <linux/moduleparam.h>
+
+static unsigned int sgx_loaded_back;
+module_param(sgx_loaded_back, uint, 0440);
+
 int sgx_vm_insert_pfn(struct vm_area_struct *vma, unsigned long addr, resource_size_t pa)
 {
 	int rc;
@@ -219,6 +224,8 @@ int sgx_eldu(struct sgx_encl *encl,
 		sgx_err(encl, "ELDU returned %d\n", ret);
 		ret = -EFAULT;
 	}
+
+	sgx_loaded_back++;
 
 	kunmap_atomic((void *)(unsigned long)(pginfo.pcmd - pcmd_offset));
 	kunmap_atomic((void *)(unsigned long)pginfo.srcpge);
