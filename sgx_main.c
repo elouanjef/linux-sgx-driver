@@ -70,6 +70,7 @@
 #include <linux/hashtable.h>
 #include <linux/kthread.h>
 #include <linux/platform_device.h>
+#include <linux/proc_fs.h>
 
 #define DRV_DESCRIPTION "Intel SGX Driver"
 #define DRV_VERSION "2.11.0"
@@ -152,14 +153,23 @@ static unsigned long sgx_get_unmapped_area(struct file *file,
 }
 
 static const struct file_operations sgx_fops = {
-	.owner			= THIS_MODULE,
-	.unlocked_ioctl		= sgx_ioctl,
+    .owner          = THIS_MODULE,
+    .unlocked_ioctl = sgx_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl		= sgx_ioctl,
+    .compat_ioctl   = sgx_ioctl,
 #endif
-	.mmap			= sgx_mmap,
-	.get_unmapped_area	= sgx_get_unmapped_area,
+    .mmap           = sgx_mmap,
+    .get_unmapped_area = sgx_get_unmapped_area,
 };
+
+// static const struct proc_ops sgx_fops = {
+// 	.proc_ioctl	= sgx_ioctl,
+// #ifdef CONFIG_COMPAT
+// 	.proc_compat_ioctl = sgx_ioctl,
+// #endif
+// 	.proc_mmap = sgx_mmap,
+// 	.proc_get_unmapped_area = sgx_get_unmapped_area,
+// };
 
 static struct miscdevice sgx_dev = {
  .minor	= MISC_DYNAMIC_MINOR,
@@ -174,12 +184,11 @@ static int sgx_stats_open(struct inode *inode, struct file *file)
 	return single_open(file, sgx_stats_read, NULL);
 }
 
-static struct file_operations sgx_stats_ops = {
-	.owner = THIS_MODULE,
-	.open = sgx_stats_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release
+static struct proc_ops sgx_stats_ops = {
+	.proc_open = sgx_stats_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = single_release
 };
 
 static struct seq_operations sgx_encl_seq_ops = {
@@ -194,12 +203,11 @@ static int sgx_encl_open(struct inode *inode, struct file *file)
 	return seq_open(file, &sgx_encl_seq_ops);
 }
 
-static struct file_operations sgx_encl_ops = {
-	.owner = THIS_MODULE,
-	.open = sgx_encl_open,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = seq_release
+static struct proc_ops sgx_encl_ops = {
+	.proc_open = sgx_encl_open,
+	.proc_read = seq_read,
+	.proc_lseek = seq_lseek,
+	.proc_release = seq_release
 };
 #endif
 
